@@ -1,193 +1,275 @@
 
-# token-efficiency-llm
 
-[![Node.js](https://img.shields.io/badge/node-%3E%3D18-green)](https://nodejs.org)
-[![TypeScript](https://img.shields.io/badge/language-typescript-blue)](https://www.typescriptlang.org/)
-[![License](https://img.shields.io/badge/license-MIT-black)](LICENSE)
-[![Status](https://img.shields.io/badge/status-experimental-orange)]()
-[![LLM](https://img.shields.io/badge/llm-OpenAI%20%7C%20Anthropic-purple)]()
+# token-efficiency-knowledge
 
----
+[![Topic](https://img.shields.io/badge/topic-token%20efficiency-black)]()
+[![Focus](https://img.shields.io/badge/focus-prompt%20optimization-blue)]()
+[![Status](https://img.shields.io/badge/status-informational-orange)]()
+[![Scope](https://img.shields.io/badge/scope-language%20and%20prompting-purple)]()
+[![Use](https://img.shields.io/badge/use-llms%20and%20agents-green)]()
 
 ## Overview
 
-This repository evaluates whether **language choice (e.g., Chinese vs English)** materially reduces **token usage** in LLM interactions, and whether any savings persist **without degrading task performance**.
+This document explains how token usage works in large language models and how to reduce it effectively. It focuses on prompt efficiency, language choice, compression strategies, and realistic trade-offs.
 
-It provides:
-
-* deterministic token counting
-* cross-language prompt variants
-* cost estimation
-* task-level benchmarking (quality + latency)
-
-Target models include offerings from OpenAI and Anthropic.
+Token optimization is not about minimizing characters blindly. It is about **reducing total cost per correct result**, which includes input tokens, output tokens, retries, and corrections.
 
 ---
 
-## Problem Statement
+## Why token efficiency matters
 
-LLMs are constrained by:
+* Token-based billing directly affects cost
+* Context windows are limited
+* Latency increases with token volume
+* Larger prompts reduce space for memory and reasoning
 
-* token-based pricing
-* context window limits
-* tokenizer-specific segmentation
-
-Hypothesis:
-
-* logographic languages (e.g., Chinese) may encode semantics with fewer tokens than English
-
-Counter-risk:
-
-* instruction fidelity and output quality may degrade
-* model-specific tokenizers behave differently
+Poor prompt design typically wastes more tokens than language choice ever will.
 
 ---
 
-## What This Repo Does
+## Core idea
 
-* Compares **token counts** for semantically equivalent prompts across languages
-* Benchmarks **task outcomes** (summarization, extraction, transformation)
-* Estimates **cost deltas** under real pricing
-* Surfaces **failure modes** (instruction drift, hallucination, formatting errors)
+Token efficiency must be evaluated holistically:
 
----
+* Fewer tokens ≠ better result
+* Shorter prompts ≠ clearer instructions
+* Language choice ≠ guaranteed savings
 
-## Non-Goals
+The only metric that matters:
 
-* Not a translation library
-* Not a production prompt framework
-* Not claiming language switching as a primary optimization strategy
+> **Cost per successful, correct output**
 
 ---
 
-## Methodology
+## Language choice and token efficiency
 
-1. **Prompt Parity**
+Using languages like Chinese can **sometimes reduce token usage**, but only under specific conditions.
 
-   * Create equivalent prompts in `en` and `zh`
-   * Enforce structural symmetry (same constraints, output schema)
+### Why Chinese can be more token-efficient
 
-2. **Token Measurement**
+Chinese is a logographic language. Individual characters often encode more meaning than English subword tokens.
 
-   * Use model-aligned tokenizers (e.g., `tiktoken` for OpenAI)
-   * Count input, output, and total tokens
+Example conceptually:
 
-3. **Task Evaluation**
+* English: multiple tokens per word
+* Chinese: fewer tokens per semantic unit
 
-   * Deterministic checks where possible (schema validation, regex)
-   * Heuristic scoring for free-form tasks (ROUGE-like, length bounds)
+This can lead to:
 
-4. **Cost Modeling**
-
-   * Map tokens → USD using current pricing tables
-   * Report per-call and aggregate costs
-
-5. **Repeatability**
-
-   * Fixed seeds where supported
-   * Multiple runs to reduce variance
+* shorter prompts for simple instructions
+* denser representation of repeated commands
 
 ---
 
-## Repository Structure
+### When it actually helps
 
-```bash
-.
-├── prompts/
-│   ├── en/                 # English prompts
-│   └── zh/                 # Chinese prompts (manual, not auto-translated)
-├── tasks/
-│   ├── summarize.ts
-│   ├── extract.ts
-│   └── transform.ts
-├── scripts/
-│   ├── compareTokens.ts    # raw token counts
-│   ├── runBench.ts         # executes tasks across models/languages
-│   └── report.ts           # aggregates metrics
-├── utils/
-│   ├── tokenizer.ts        # model-specific tokenization
-│   ├── client.ts           # OpenAI/Anthropic wrappers
-│   ├── cost.ts             # pricing calculations
-│   └── eval.ts             # validators and scorers
-├── results/
-│   ├── runs.json
-│   └── summary.csv
-├── .env.example
-└── README.md
-```
+Language switching can be useful when:
+
+* prompts are short and repetitive
+* instructions are simple and structured
+* token limits are tight
+* the model handles the language well
+* the workflow is large-scale (cost sensitivity matters)
+
+In these cases, you might see measurable reductions in input tokens.
 
 ---
 
-## Installation
+### Where it breaks
 
-```bash
-git clone https://github.com/your-username/token-efficiency-llm.git
-cd token-efficiency-llm
-npm install
-```
+This is where most people mess up.
 
----
+* Models are often more optimized for English instructions
+* Subtle meaning can get lost in translation
+* Output formatting may become less consistent
+* Mixed-language prompts can confuse behavior
+* Debugging becomes harder for teams
+* Token savings in input may be offset by longer outputs or retries
 
-## Configuration
-
-Create `.env`:
-
-```bash
-OPENAI_API_KEY=...
-ANTHROPIC_API_KEY=...
-DEFAULT_MODEL_OPENAI=gpt-4.1-mini
-DEFAULT_MODEL_ANTHROPIC=claude-3-5-sonnet
-```
+So yes, Chinese can reduce tokens. But it can also quietly degrade system reliability.
 
 ---
 
-## Usage
+### Practical rule
 
-### 1) Token comparison (no API calls)
+Use alternative languages only if:
 
-```bash
-npm run compare
-```
+* you have benchmarked token savings
+* output quality remains stable
+* your team can maintain those prompts
+* total cost (not just input tokens) improves
 
-Outputs per-prompt token counts:
-
-```json
-{
-  "prompt": "summarize/basic",
-  "en": { "input_tokens": 42 },
-  "zh": { "input_tokens": 28 },
-  "delta_pct": -33.3
-}
-```
+Otherwise, you are trading clarity for marginal gains.
 
 ---
 
-### 2) Benchmark tasks (API calls)
+## Better token-saving methods than language switching
 
-```bash
-npm run bench
-```
+Most meaningful optimization comes from prompt design.
 
-Produces `results/runs.json` with:
+### 1. Remove filler language
 
-* input/output tokens
-* latency
-* cost
-* validation pass/fail
-* normalized score (if applicable)
+Bad:
+“Please carefully analyze the following and provide a detailed response.”
+
+Better:
+“Analyze and return structured output.”
 
 ---
 
-### 3) Aggregate report
+### 2. Use compact, explicit instructions
 
-```bash
-npm run report
-```
+Structure:
 
-Outputs `results/summary.csv`:
+* task
+* constraints
+* format
 
-| task | model | lang | in_tok | out_tok | total | cost_usd | latency_ms | pass_rate |
-| ---- | ----- | ---- | ------ | ------- | ----- | -------- | ---------- | --------- |
+Example:
+“Summarize in 5 bullets. Max 10 words each. No intro.”
+
+---
+
+### 3. Force structured output
+
+Prefer:
+
+* JSON
+* key-value
+* bullet lists
+
+Avoid long-form prose unless necessary.
+
+---
+
+### 4. Control output length
+
+Output tokens are often the biggest cost.
+
+Examples:
+
+* “Return only JSON”
+* “Max 3 lines”
+* “No explanation”
+
+---
+
+### 5. Avoid repeated context
+
+Major waste source:
+
+* resending same instructions
+* repeating system prompts
+* duplicating examples
+
+Send only what changes.
+
+---
+
+### 6. Use controlled shorthand
+
+Example:
+Instead of repeating long instructions:
+“Concise, technical, structured.”
+
+Short, reusable patterns reduce tokens safely if consistent.
+
+---
+
+### 7. Limit examples
+
+Few-shot prompting is expensive. Use only when necessary.
+
+---
+
+### 8. Separate instruction from data
+
+Clean structure improves efficiency and accuracy:
+
+* instruction
+* constraints
+* input
+* output format
+
+---
+
+### 9. Compress behavioral rules
+
+Avoid long descriptions of tone or style. Use minimal directives.
+
+---
+
+### 10. Avoid obvious instructions
+
+Do not waste tokens on:
+
+* “Be clear”
+* “Use proper grammar”
+
+Specify only what is critical.
+
+---
+
+## Tricks and their real value
+
+### Multilingual prompting
+
+* Sometimes useful
+* Requires testing
+* Not universally reliable
+
+### Abbreviations
+
+* Efficient if standardized
+* Risky if ambiguous
+
+### Symbol-based prompts
+
+* Works in controlled systems
+* Not robust for general usage
+
+### Extreme compression
+
+* Often reduces clarity
+* Can increase retries
+
+---
+
+## Efficiency is not just input tokens
+
+True efficiency includes:
+
+* input tokens
+* output tokens
+* retry frequency
+* correction overhead
+* formatting accuracy
+* task success rate
+
+A slightly longer prompt that works correctly once is cheaper than a shorter one that fails twice.
+
+---
+
+## Decision model
+
+Before applying any optimization:
+
+* Does it reduce tokens?
+* Does it preserve correctness?
+* Does it reduce retries?
+* Is it maintainable?
+* Does it work consistently across models?
+
+If only token count improves, the optimization is weak.
+
+---
+
+## Bottom line
+
+* Language choice (like Chinese) can help in some cases
+* It is a **secondary optimization**, not a primary one
+* Prompt design and output control deliver far larger gains
+* Measure everything before adopting any trick
 
 ---
 
